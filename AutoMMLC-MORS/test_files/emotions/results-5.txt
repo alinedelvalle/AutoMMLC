@@ -1,0 +1,13 @@
+Number of queries on the classifier and objectives map: 0
+Number of classifiers exceeding the time limit: 0
+Execution time: 5.283815145492554
+Classifiers:
+ClassifierChain(classifier=BernoulliNB(alpha=0.01,fit_prior=True))
+MLkNN(k=12)
+BinaryRelevance(classifier=DecisionTreeClassifier(criterion='entropy',max_depth=1,min_samples_split=6,min_samples_leaf=14))
+F_score
+0.36229508196721316 0.6295081967213113 0.5870413739266197 
+Time
+0.016965389251708984 0.4032707214355469 0.03160691261291504 
+Hypervolume:
+377.6745423930217
