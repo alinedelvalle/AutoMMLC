@@ -41,12 +41,12 @@ if __name__ == "__main__":
         limit_time = int(sys.argv[6])           # tempo limite para execução do algoritmo multirrótulo
         project = str(sys.argv[7])              # folder do projeto
     else:
-        name_dataset = 'genbase'
+        name_dataset = 'emotions'
         k = 0 # um número de 0 a 9
         len_poulation = 10
         number_generation = 10  
         n_thread = 3
-        limit_time = 600
+        limit_time = 10
         project = None # definir caminho aqui
      
     Config.show_compile_hint = False
@@ -102,7 +102,8 @@ if __name__ == "__main__":
     
     # Gráfico    
     # hipervolume
-    n_evals, hist_F, hv = ManipulateHistory.get_hypervolume(res, [1, limit_time])
+    ref_point= np.array([1, limit_time])
+    n_evals, hist_F, hv = ManipulateHistory.get_hypervolume(res, ref_point)
     Graphic.plot_graphic(n_evals, hv, 'Convergence-Hypervolume', 'Evaluations', 'Hypervolume', 'test_files/'+name_dataset+'/Hypervolume-'+str(k//2))    
     
     # Prepara resultados para salvar em arquivo
