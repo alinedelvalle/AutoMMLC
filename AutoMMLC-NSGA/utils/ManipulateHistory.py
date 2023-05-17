@@ -26,7 +26,7 @@ class ManipulateHistory:
         return (n_evals, hist_F)
     
     
-    def get_hypervolume(res):
+    def get_hypervolume(res, point):
         # Histórico de execução (número de avaliações e funções objetivos)
         n_evals, hist_F = ManipulateHistory.get_hist_F(res)
             
@@ -34,11 +34,11 @@ class ManipulateHistory:
         approx_ideal = res.F.min(axis=0)
         approx_nadir = res.F.max(axis=0)
         
-        ref_point_2 = approx_nadir[1]
+        #ref_point_2 = approx_nadir[1]
         
         metric = Hypervolume(
             # verificar o ponto de referência
-            ref_point= np.array([1, ref_point_2]),
+            ref_point= point,
             norm_ref_point=False,
             zero_to_one=True,
             ideal=approx_ideal,
