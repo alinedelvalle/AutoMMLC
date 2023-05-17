@@ -152,19 +152,8 @@ class MLProblem(Problem):
     def my_eval(self, s):
         classifier = eval(s)
         
-        try:
-            # treina modelo
-            start_time = time.time()
-            classifier.fit(self.x_train, self.y_train)
-            end_time = time.time()
-                    
-            # testa o modelo
-            prediction = classifier.predict(self.x_test)
-                    
-        except AttributeError:
-            # Ocorre AttributeError ao utilizar o algoritmo MLARAM
-            # Para utilizá-lo, é preciso converter o dataset para numpy.ndarray  
-                    
+        # Devido aos erros de MLARAM, RandomForestClassifier e DecisionTreeClassifier, foi tratado com if
+        if 'MLARAM' in s:
             # Treina modelo
             start_time = time.time()
             classifier.fit(self.x_train.toarray(), self.y_train)
@@ -172,12 +161,25 @@ class MLProblem(Problem):
                     
             # testa o modelo
             prediction = classifier.predict(self.x_test.toarray())
+            
+        elif 'RandomForestClassifier' in s.split('(')[0] or 'DecisionTreeClassifier' in s.split('(')[0]:                  
+            # Treina modelo
+            start_time = time.time()
+            classifier.fit(self.x_train, np.asarray(self.y_train.todense()))
+            end_time = time.time()
                     
-        except:  
-            print('------------------------------------------------------- Erro -------------------------------------------------------')
-            print(s)
-            print('------------------------------------------------------- Erro -------------------------------------------------------')
+            # testa o modelo
+            prediction = classifier.predict(self.x_test)
+            
+        else:
+            # treina modelo
+            start_time = time.time()
+            classifier.fit(self.x_train, self.y_train)
+            end_time = time.time()
                     
+            # testa o modelo
+            prediction = classifier.predict(self.x_test)
+            
         time_execution = end_time - start_time
                 
         f_score = metrics.f1_score(self.y_test, prediction, average='samples')
@@ -263,5 +265,5 @@ class MLProblem(Problem):
         out["F"] = objectives
         
         # log
-        # self.ger += 1 # geração
-        # self.to_file_ger() # armazena a geração corrente
+        self.ger += 1 # geração
+        self.to_file_ger() # armazena a geração corrente
