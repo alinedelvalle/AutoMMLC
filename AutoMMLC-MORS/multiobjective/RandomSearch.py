@@ -38,8 +38,7 @@ from utils.AlgorithmsHiperparameters import AlgorithmsHiperparameters
 # process/thread
 import multiprocessing 
 
-from multiobjective.Pareto_Froint import Individual, FNDS
-
+from multiobjective.Pareto_Froint import Point, FNDS
 
 
 class RandomSearch:
@@ -58,7 +57,7 @@ class RandomSearch:
         self.map_algs_objs = {} # algoritmo: objetivo1, objetivo2
         self.rep = 0
         # ---------------------
-        self.file_log = file_log
+        self.file_log = file_log # para log
         self.cont = 0 # para log
 
     
@@ -128,20 +127,9 @@ class RandomSearch:
     # task = classification -> paralelizável
     def task(self, s):                    
         classifier = eval(s)
-                
-        try:
-            # treina modelo
-            start_time = time.time()
-            classifier.fit(self.x_train, self.y_train)
-            end_time = time.time()
-                    
-            # testa o modelo
-            prediction = classifier.predict(self.x_test)
-                    
-        except AttributeError:
-            # Ocorre AttributeError ao utilizar o algoritmo MLARAM
-            # Para utilizá-lo, é preciso converter o dataset para numpy.ndarray  
-                    
+        
+        # Devido aos erros de MLARAM, RandomForestClassifier e DecisionTreeClassifier, foi tratado com if
+        if 'MLARAM' in s:
             # Treina modelo
             start_time = time.time()
             classifier.fit(self.x_train.toarray(), self.y_train)
@@ -149,16 +137,32 @@ class RandomSearch:
                     
             # testa o modelo
             prediction = classifier.predict(self.x_test.toarray())
+            
+        elif 'RandomForestClassifier' in s.split('(')[0] or 'DecisionTreeClassifier' in s.split('(')[0]:                  
+            # Treina modelo
+            start_time = time.time()
+            classifier.fit(self.x_train, np.asarray(self.y_train.todense()))
+            end_time = time.time()
                     
-        except:  
-            print('------------------------------------------------------- Erro -------------------------------------------------------')
-            print(s)
-            print('------------------------------------------------------- Erro -------------------------------------------------------')
+            # testa o modelo
+            prediction = classifier.predict(self.x_test)
+            
+        else:
+            # treina modelo
+            start_time = time.time()
+            classifier.fit(self.x_train, self.y_train)
+            end_time = time.time()
                     
-        time_execution = end_time - start_time
+            # testa o modelo
+            prediction = classifier.predict(self.x_test)
                 
+        # obtém o tempo de treinamento
+        time_execution = end_time - start_time
+            
+        # obtém f-score
         f_score = metrics.f1_score(self.y_test, prediction, average='samples')
         
+        # retorno: string do classificador, predição, f-score, tempo de treinamento
         return (s, prediction, f_score, time_execution)            
      
 
@@ -166,9 +170,12 @@ class RandomSearch:
         # variável de retorno: string do classificador, predição, f-score, tempo
         result = None
         
+        # algoritmo multirrótulo
         str_classifier = s[0]
         
+        # se clasificador já foi executado
         if str_classifier in self.map_algs_objs.keys():
+            # obtém f-score e tempo de treinamneto
             f1 = self.map_algs_objs.get(str_classifier)[0] # f-score
             f2 = self.map_algs_objs.get(str_classifier)[1] # time
             self.rep += 1
@@ -183,7 +190,8 @@ class RandomSearch:
             try: 
                 
                 pool = multiprocessing.Pool(processes=1)
-                # calcule os valores da função de maneira paralelizada e espere até terminar
+                # faz a classificação de maneira paralelizada e espera até terminar
+                # result possui: string do classificador, predição, f-score, tempo de treinamento
                 result = pool.apply_async(self.task, s).get(timeout=self.limit_time)
                 pool.close()
     
@@ -193,20 +201,24 @@ class RandomSearch:
                 pool.terminate()
                 self.classifier_limit_time += 1
                 
+                # result possui: string do classificador, não há predição, f-score é 0, 
+                # tempo de treinamento é o tempo limite de treinamento do classificador
                 result = (str_classifier, None, 0, self.limit_time) 
-              
+             
+            # salva classificador, f-score e tempo de treinamento no mapa    
             # formato de result: (string, prediction, f1, f2) 
             self.map_algs_objs[str_classifier]= (result[2], result[3])
             
         # log
-        # self.cont += 1 # contador
-        # self.to_file() # armazena a avaliação corrente
+        self.cont += 1 # contador
+        self.to_file() # armazena n-th classificador avaliado
          
-        # retorno: str_classifier, f-score, time, prediction
+        # retorno: str_classifier, prediction, f-score, time
         return result
     
 
     def execute_random_search(self):
+        # seleciona os algoritmos de classificação multirrótulo do espaço de busca
         params = [[self.get_ml_algorithm()] for k in range(self.termination)]
         
         # pool de threads       
@@ -219,26 +231,35 @@ class RandomSearch:
 
         i = 0
         
-        list_individuals = []
+        # até aqui trabalhamos com f-score, para encontrar a fronteira de pareto utilizamos: 1 - f-score
+        # para encontrar a fronteira, cada algoritmo de classificação é tratado como um ponto
+        
+        list_points = []
         for res in results:
             # formato de res = (k, string do classificador, f-score, time, prediction)
             s, prediction, f_score, time_execution = res
             
             # print(f'{i} - {s}, {f_score}, {time_execution}\n')
             
-            # para os casos em que há classificação - não houve interrupção por limite de tempo
-            if prediction is not None:
-                # salva histórico de modelos treinados e suas métricas
-                AlgorithmsHiperparameters.add_metrics(i, prediction, self.y_test, time_execution, s)
+            # se não há predição (houve interrupção por limite de tempo de treinamneto ou o algoritmo de otimização já foi avaliado)
+            if prediction is None:
+                # salva algoritmo de classificação, f-score e tempo de treinamento
+                AlgorithmsHiperparameters.add_metrics1(i, f_score, time_execution, s)  
+            # para os casos em que há predição, calcula as métricas e salva
+            else:
+                # salva algoritmo de classificação e suas métricas
+                AlgorithmsHiperparameters.add_metrics2(i, prediction, self.y_test, time_execution, s)
             
-            individual = Individual(1-f_score, time_execution, s)
-            list_individuals.append(individual)
+            # cria um ponto e adiciona na lista de pontos
+            pto = Point(1-f_score, time_execution, s)
+            list_points.append(pto)
             
             i += 1
         
         
+        # encontra a fronteira de pareto
         fnds = FNDS()
-        pareto_froint = fnds.execute(list_individuals)    
-        #fnds.plot_froint(list_individuals, pareto_froint, 'Objective Space', 'F Score', 'Time', None)
+        pareto_froint = fnds.execute(list_points)    
+        #fnds.plot_froint(list_points, pareto_froint, 'Objective Space', 'F Score', 'Time', None)
         
         return pareto_froint
